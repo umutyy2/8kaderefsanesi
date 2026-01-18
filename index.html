@@ -3,174 +3,104 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Sekiz Kader v8.0 - Efsanevi Tam Sürüm</title>
+<title>Sekiz Kader v15.0 - Nihai Restorasyon</title>
 <style>
-  html, body { height: 100%; margin: 0; overflow: hidden; background: #010409; color: #fff; font-family: 'Georgia', serif; user-select: none; -webkit-user-select: none; }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: #010409; color: #fff; font-family: 'Georgia', serif; user-select: none; }
   .wrap { display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; }
-  .bigbtn { width: 92vw; height: 75vh; border-radius: 40px; background: radial-gradient(circle, #1a202c 0%, #010409 100%); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; text-align: center; border: 4px solid #30363d; box-shadow: 0 0 60px rgba(0,0,0,1); padding: 30px; box-sizing: border-box; }
-  .status { margin-top: 15px; color: #8b949e; font-size: 0.85rem; }
+  .bigbtn { width: 92vw; height: 75vh; border-radius: 40px; background: radial-gradient(circle, #1a202c 0%, #010409 100%); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; text-align: center; border: 4px solid #30363d; padding: 30px; box-sizing: border-box; box-shadow: 0 0 50px rgba(0,0,0,1); }
+  .menu-ui { position: absolute; top: 10px; font-size: 0.8rem; color: #8b949e; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div id="big" class="bigbtn">DESTAN YÜKLENİYOR...<br>DOKUN VE BAŞLAT</div>
-  <div class="status">Kaydır: Seç | Çift Tık: Onayla</div>
+  <div id="ui" class="menu-ui">Mod: Giriş | Dokun ve Başlat</div>
+  <div id="big" class="bigbtn">SEKİZ KADER EFSANESİ<br>V15.0<br><br>BAŞLATMAK İÇİN DOKUN</div>
 </div>
 
 <script>
-/* --- SES MOTORU --- */
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const synth = window.speechSynthesis;
-let voices = [], currentVoiceIndex = 0, currentRate = 1.1;
-
-function playEff(f, d, type='sine') {
-  const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-  o.type = type; o.frequency.setValueAtTime(f, audioCtx.currentTime);
-  g.gain.setValueAtTime(0.1, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + d);
-  o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
-}
+let voices = [];
+let config = { rate: 1.1, voiceIdx: 0 };
+let player = { hp: 100, score: { pwr:0, sac:0, kno:0, bet:0 } };
+let mode = 'intro'; 
+let step = 0;
 
 function speak(text) {
-  synth.cancel(); const u = new SpeechSynthesisUtterance(text);
-  if(voices[currentVoiceIndex]) u.voice = voices[currentVoiceIndex];
-  u.rate = currentRate; synth.speak(u);
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'tr-TR';
+  u.rate = config.rate;
+  if(voices[config.voiceIdx]) u.voice = voices[config.voiceIdx];
+  synth.speak(u);
+  document.getElementById('big').innerText = text;
 }
 
-/* --- OYUNCU VE KADER VERİLERİ --- */
-let mode = 'menu', menuIdx = 0, charIdx = 0, step = 0;
-let player = { 
-    hp: 100, char: null, defending: false,
-    score: { pwr:0, sac:0, kno:0, bet:0 } 
-};
-let enemy = { name: "", hp: 0 };
-
-const characters = [
-  { n: 'Aran', r: 'Savaşçı', s1: 'Adalet Vuruşu', s2: 'Kalkan Siperi', d: 'Grubun kalkanı. Gururlu ve güçlü.' },
-  { n: 'Lira', r: 'Gölge', s1: 'Zehirli Hançer', s2: 'Gölge Adımı', d: 'Hızlı ve tehlikeli. Geçmişi sırlarla dolu.' },
-  { n: 'Brom', r: 'Rahip', s1: 'Çekiç Savurma', s2: 'Kutsal Işık', d: 'İnancıyla grubu ayakta tutan bilge cüce.' },
-  { n: 'Sera', r: 'Bilge', s1: 'Büyü Patlaması', s2: 'Run Koruması', d: 'Taçın sırlarını çözebilecek tek kişi.' }
+// BÖLÜM VERİLERİ (Story.html'den Kesin Veriler)
+const story = [
+  { id: 1, n: "Giriş Salonları", d: "Aran: 'Herkes kalkanımın arkasına!' diye bağırdı. Sağ: Aran siper olsun. Sol: Herkes kaçsın.", s: 'sac' },
+  { id: 2, n: "Aynalar Koridoru", d: "Sera yansımasıyla konuşuyor: 'Güç senin olabilir.' Sağ: Gücü al. Sol: Reddet.", s: 'bet' },
+  { id: 3, n: "Ruhların Kütüphanesi", d: "Kitaplar fısıldıyor. Sera: 'Ritüel için bir anı feda etmeliyim.' Sağ: Hafızayı ver (Bilgi al). Sol: Geç.", s: 'kno' },
+  { id: 4, n: "Sırlı Bahçe", d: "Brom meyveyi kopardı! Sarmaşıklar saldırdı. Sağ: Lira'nın yolundan git. Sol: Savaş.", s: 'pwr' },
+  { id: 5, n: "Ateş Kesiti", d: "Lira: 'Bu sıcaklık aklımı alıyor!' dedi. Kristal lavda. Sağ: Kristali al. Sol: Adaleti koru.", s: 'pwr' },
+  { id: 6, n: "Gölgeler Labirenti", d: "En derin korkunla yüzleşiyorsun. Sağ: Korkunla savaş. Sol: Geri çekil.", s: 'sac' },
+  { id: 7, n: "Final: Taç Odası", d: "Taç önünde parlıyor. Kader anı. Sağ: Tacı Tak. Sol: Tacı Kır." }
 ];
 
-/* --- KONTROLLER --- */
-let lastT = 0, tX=0, tY=0;
-const big = document.getElementById('big');
+function handleInput(act) {
+  if (mode === 'intro') {
+    mode = 'game';
+    runChapter();
+  } else if (mode === 'game') {
+    const c = story[step];
+    if (act === 'R') { player.score[c.s] += 2; } 
+    else if (act === 'L') { player.score.bet += 1; }
+    
+    step++;
+    if (step < story.length) runChapter();
+    else calculateEnding(act === 'R');
+  }
+}
 
-big.addEventListener('touchstart', e => { tX=e.touches[0].clientX; tY=e.touches[0].clientY; audioCtx.resume(); });
-big.addEventListener('touchend', e => {
-  const dx = e.changedTouches[0].clientX - tX, dy = e.changedTouches[0].clientY - tY;
-  const now = Date.now();
-  if (Math.abs(dx)>50 || Math.abs(dy)>50) handleAct(Math.abs(dx)>Math.abs(dy)?(dx>0?'R':'L'):(dy>0?'D':'U'));
-  else if (now - lastT < 300) handleAct('DT');
-  lastT = now;
+function runChapter() {
+  const c = story[step];
+  document.getElementById('ui').innerText = "Bölüm: " + c.id + " / 7";
+  speak(c.n + ". " + c.d);
+}
+
+function calculateEnding(tookCrown) {
+  mode = 'end';
+  const s = player.score;
+  let final = "";
+  if(tookCrown) {
+    if(s.bet > 3) final = "Son 1: Taç’ın Karanlık Hükmü. Zindan Taç ile birleşti.";
+    else if(s.pwr > 3) final = "Son 4: Güç Dengesi. Dünya sert bir adaletle yönetiliyor.";
+    else final = "Son 5: Taç'ın Hürriyeti. Gölgeler dünyayı istila etti.";
+  } else {
+    if(s.sac > 3) final = "Son 2: Kırılış ve Yok Oluş. Zindan çöktü, dünya kurtuldu.";
+    else if(s.kno > 3) final = "Son 3: Taç'ı Saklamak. Lira ebedi nöbeti seçti.";
+    else final = "Son 8: Sonsuz Döngü. Macera yeniden başlıyor.";
+  }
+  speak(final);
+  setTimeout(() => location.reload(), 12000);
+}
+
+// Touch & Swipe Logic
+let tX, tY;
+document.getElementById('big').addEventListener('touchstart', e => { 
+  tX = e.touches[0].clientX; 
+  tY = e.touches[0].clientY; 
+  if(audioCtx.state === 'suspended') audioCtx.resume();
 });
 
-function handleAct(act) {
-  if (mode === 'menu') {
-    if (act==='U'||act==='D') { menuIdx=(menuIdx+(act==='D'?1:-1)+2)%2; speak(menuIdx===0?"Macerayı Başlat":"Ayarlar"); }
-    else if (act==='DT') { if(menuIdx===0){ mode='char'; speak("Karakterini seç: " + characters[0].n); } }
-  } 
-  else if (mode === 'char') {
-    if (act==='U'||act==='D') { charIdx=(charIdx+(act==='D'?1:-1)+4)%4; speak(characters[charIdx].n + ". " + characters[charIdx].d); }
-    else if (act==='DT') { player.char = characters[charIdx]; mode='story'; playEff(400, 0.5); nextChapter(); }
-  }
-  else if (mode === 'story') handleStory(act);
-  else if (mode === 'combat') handleCombat(act);
-}
+document.getElementById('big').addEventListener('touchend', e => {
+  const dX = e.changedTouches[0].clientX - tX;
+  const dY = e.changedTouches[0].clientY - tY;
+  if (Math.abs(dX) > 40) handleInput(dX > 0 ? 'R' : 'L');
+  else if (Math.abs(dY) < 10) handleInput('TAP');
+});
 
-/* --- HİKAYE AKIŞI --- */
-function nextChapter() {
-  step++;
-  if(step===1) {
-    speak("Bölüm 1: Giriş Salonları. Brom fısıldıyor: 'Burada kadim bir öfke var'. Bir tuzak tetiklendi! Taş kafes düşüyor! Sağ: Göğüsle. Sol: Kaç.");
-  } else if(step===2) {
-    speak("Bölüm 2: Aynalar Koridoru. Sera yansımasıyla konuşuyor. Karanlık bir ses: 'Bana güven, sana her şeyi vereyim' diyor. Sağ: Gücü al. Sol: Reddet.");
-  } else if(step===3) {
-    speak("Bölüm 4: Sırlı Bahçe. Bitkiler canlanıyor. Zehirli bir sarmaşık Brom'u yakaladı! Onu kurtarmak için savaşmalısın.");
-    setTimeout(() => startCombat("Bitki Canavarı", 70), 3000);
-  } else if(step===4) {
-    speak("Bölüm 6: Gölgeler Labirenti. Lira bir kestirme yol buldu ama tehlikeli görünüyor. Sağ: Kestirmeyi seç. Sol: Güvenli ama uzun yoldan git.");
-  } else if(step===5) {
-    speak("Bölüm 7: Taç Odası. Final. Taç önünde parlıyor. Kaderin parmak uçlarında. Sağ: Tacı tak ve mutlak güce ulaş. Sol: Tacı kır ve döngüyü bitir.");
-  }
-}
-
-function handleStory(act) {
-  if(step===1) {
-    if(act==='R') { player.score.sac+=2; speak("Aran kalkanını kaldırdı! 'Geçin!' diye kükredi. Fedakarlığın takdir edildi."); }
-    else { player.score.bet+=1; speak("Zarifçe kaçtınız ama güven sarsıldı."); }
-    nextChapter();
-  } else if(step===2) {
-    if(act==='R') { player.score.pwr+=2; player.score.bet+=2; speak("Güç ruhuna işledi. Gözlerin parlıyor."); }
-    else { player.score.sac+=1; speak("Yansımayı kırdın. Yoluna devam ediyorsun."); }
-    nextChapter();
-  } else if(step===4) {
-    if(act==='R') { player.score.kno+=2; player.score.bet+=1; speak("Kestirme yol sırlar fısıldıyor."); }
-    nextChapter();
-  } else if(step===5) {
-    calculateFinalEnding(act==='R');
-  }
-}
-
-/* --- SAVAŞ SİSTEMİ --- */
-function startCombat(name, hp) {
-  mode='combat'; enemy={name, hp};
-  speak(name + " karşında! Yukarı: " + player.char.s1 + ". Aşağı: " + player.char.s2);
-}
-
-function handleCombat(act) {
-  let dmg = 0;
-  player.defending = false;
-
-  if(act==='U') { // Birinci Yetenek (Saldırı)
-    dmg = 20 + (player.char.n === 'Sera' ? 10 : 0);
-    playEff(600, 0.2, 'square');
-    speak(player.char.s1 + "!");
-  } else if(act==='D') { // İkinci Yetenek (Savunma/Özel)
-    if(player.char.n === 'Brom') {
-      player.hp = Math.min(100, player.hp + 25);
-      playEff(800, 0.4);
-      speak("Kutsal Işık yaralarını sardı.");
-    } else if(player.char.n === 'Aran') {
-      player.defending = true;
-      speak("Kalkanın arkasına sığındın.");
-    } else {
-      dmg = 15;
-      playEff(400, 0.2, 'sawtooth');
-      speak(player.char.s2 + "!");
-    }
-  }
-
-  enemy.hp -= dmg;
-  if(enemy.hp <= 0) {
-    mode='story'; speak(enemy.name + " yok edildi. Sera: 'Daha kötüsü geliyor' dedi.");
-    nextChapter();
-  } else {
-    // Düşman saldırısı
-    let eDmg = 15;
-    if(player.defending) eDmg = 5;
-    player.hp -= eDmg;
-    playEff(100, 0.3);
-    if(player.hp <= 0) { speak("Zindanın karanlığında yok oldun."); location.reload(); }
-    else speak(enemy.name + " saldırdı. Canın: " + player.hp);
-  }
-}
-
-/* --- 8 FARKLI SON HESAPLAMA --- */
-function calculateFinalEnding(tookCrown) {
-  const s = player.score;
-  if(tookCrown) {
-    if(s.bet > 2) speak("Son 1: Taç'ın Karanlık Hükmü. Zindanın yeni efendisi sensin.");
-    else if(s.pwr > 3) speak("Son 4: Güç Dengesi. Dünyayı sert bir adaletle yönetiyorsun.");
-    else speak("Son 5: İhanetin Bedeli. Tacı aldın ama dostların seni terk etti.");
-  } else {
-    if(s.sac > 3) speak("Son 2: Kahramanın Fedakarlığı. Zindan çöktü, dünya kurtuldu.");
-    else if(s.kno > 3) speak("Son 3: Bilgelik Yolu. Taç yok edildi, sırlar sonsuza dek gömüldü.");
-    else speak("Son 8: Sonsuz Döngü. Hiçbir seçim dengeyi bozamadı. Kader seni başa döndürdü.");
-  }
-  setTimeout(()=>location.reload(), 15000);
-}
-
-speechSynthesis.onvoiceschanged = () => { voices = synth.getVoices().filter(v=>v.lang.includes('tr')); };
+window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
 </script>
 </body>
 </html>
