@@ -3,104 +3,129 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Sekiz Kader v15.0 - Nihai Restorasyon</title>
+<title>Sekiz Kader v16.0 - Efsanevi İskelet</title>
 <style>
   html, body { height: 100%; margin: 0; overflow: hidden; background: #010409; color: #fff; font-family: 'Georgia', serif; user-select: none; }
-  .wrap { display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; }
-  .bigbtn { width: 92vw; height: 75vh; border-radius: 40px; background: radial-gradient(circle, #1a202c 0%, #010409 100%); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; text-align: center; border: 4px solid #30363d; padding: 30px; box-sizing: border-box; box-shadow: 0 0 50px rgba(0,0,0,1); }
-  .menu-ui { position: absolute; top: 10px; font-size: 0.8rem; color: #8b949e; }
+  .wrap { display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; position: relative; }
+  .stats { position: absolute; top: 20px; width: 90%; display: flex; justify-content: space-between; font-size: 0.9rem; color: #8b949e; z-index: 10; }
+  .hp-bar { width: 100px; height: 10px; background: #30363d; border-radius: 5px; overflow: hidden; }
+  .hp-fill { height: 100%; background: #238636; width: 100%; transition: width 0.3s; }
+  .bigbtn { width: 92vw; height: 70vh; border-radius: 40px; background: radial-gradient(circle, #161b22 0%, #010409 100%); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; text-align: center; border: 4px solid #30363d; padding: 30px; box-sizing: border-box; box-shadow: 0 0 80px rgba(0,0,0,1); cursor: pointer; transition: transform 0.1s; }
+  .bigbtn:active { transform: scale(0.98); }
+  .menu-hint { margin-top: 20px; font-size: 0.8rem; color: #484f58; animation: pulse 2s infinite; }
+  @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div id="ui" class="menu-ui">Mod: Giriş | Dokun ve Başlat</div>
-  <div id="big" class="bigbtn">SEKİZ KADER EFSANESİ<br>V15.0<br><br>BAŞLATMAK İÇİN DOKUN</div>
+  <div class="stats">
+    <div id="charName">Kader Yolcusu</div>
+    <div class="hp-bar"><div id="hpFill" class="hp-fill"></div></div>
+  </div>
+  <div id="big" class="bigbtn">SEKİZ KADER<br>ANA MENÜ<br><br>BAŞLAMAK İÇİN ÇİFT TIKLA</div>
+  <div class="menu-hint">Yukarı/Aşağı: Menüde Gezin | Çift Tık: Seç</div>
 </div>
 
 <script>
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const synth = window.speechSynthesis;
 let voices = [];
-let config = { rate: 1.1, voiceIdx: 0 };
-let player = { hp: 100, score: { pwr:0, sac:0, kno:0, bet:0 } };
-let mode = 'intro'; 
+let conf = { rate: 1.1, pitch: 1 };
+let player = { hp: 100, char: null, score: { pwr:0, sac:0, kno:0, bet:0 } };
+let mode = 'menu'; // menu, char_select, game, settings, end
+let menuIdx = 0;
+const menuItems = ["OYUNA BAŞLA", "KARAKTER SEÇ", "AYARLAR", "YAPIMCILAR"];
+let charIdx = 0;
+const chars = [
+  { n: "Aran", d: "Savaşçı. Kalkanı ile hasarı engeller.", skill: "Kalkan Dağı", hp: 120 },
+  { n: "Sera", d: "Bilge. Ritüelleri ve gizli yolları bilir.", skill: "Kadim Rün", hp: 80 },
+  { n: "Brom", d: "Rahip. Kutsal ışıkla can tazeler.", skill: "Şifa Nuru", hp: 100 },
+  { n: "Lira", d: "Gölge. Sinsi ve hızlı hareket eder.", skill: "Gölge Adımı", hp: 90 }
+];
 let step = 0;
-
-function speak(text) {
-  synth.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'tr-TR';
-  u.rate = config.rate;
-  if(voices[config.voiceIdx]) u.voice = voices[config.voiceIdx];
-  synth.speak(u);
-  document.getElementById('big').innerText = text;
-}
-
-// BÖLÜM VERİLERİ (Story.html'den Kesin Veriler)
 const story = [
-  { id: 1, n: "Giriş Salonları", d: "Aran: 'Herkes kalkanımın arkasına!' diye bağırdı. Sağ: Aran siper olsun. Sol: Herkes kaçsın.", s: 'sac' },
-  { id: 2, n: "Aynalar Koridoru", d: "Sera yansımasıyla konuşuyor: 'Güç senin olabilir.' Sağ: Gücü al. Sol: Reddet.", s: 'bet' },
-  { id: 3, n: "Ruhların Kütüphanesi", d: "Kitaplar fısıldıyor. Sera: 'Ritüel için bir anı feda etmeliyim.' Sağ: Hafızayı ver (Bilgi al). Sol: Geç.", s: 'kno' },
-  { id: 4, n: "Sırlı Bahçe", d: "Brom meyveyi kopardı! Sarmaşıklar saldırdı. Sağ: Lira'nın yolundan git. Sol: Savaş.", s: 'pwr' },
-  { id: 5, n: "Ateş Kesiti", d: "Lira: 'Bu sıcaklık aklımı alıyor!' dedi. Kristal lavda. Sağ: Kristali al. Sol: Adaleti koru.", s: 'pwr' },
-  { id: 6, n: "Gölgeler Labirenti", d: "En derin korkunla yüzleşiyorsun. Sağ: Korkunla savaş. Sol: Geri çekil.", s: 'sac' },
-  { id: 7, n: "Final: Taç Odası", d: "Taç önünde parlıyor. Kader anı. Sağ: Tacı Tak. Sol: Tacı Kır." }
+  { t: "Bölüm 1: Giriş Salonları", d: "Taş kafes düşüyor! Sağ: Siper ol. Sol: Kaç.", s: 'sac' },
+  { t: "Bölüm 2: Aynalar Koridoru", d: "Karanlık yansıma fısıldıyor: 'Gücü al'. Sağ: Kabul et. Sol: Reddet.", s: 'bet' },
+  { t: "Bölüm 3: Ruhların Kütüphanesi", d: "Sera: 'Bilgi için bir anı feda etmeliyim.' Sağ: Hafızayı feda et. Sol: Geç.", s: 'kno' },
+  { t: "Bölüm 4: Sırlı Bahçe", d: "Zehirli sarmaşıklar yolu kapattı! Sağ: Savaş. Sol: Kaç.", s: 'pwr' },
+  { t: "Bölüm 5: Ateş Kesiti", d: "Lavların ortasında parlayan kristal... Sağ: Kristali al. Sol: Adaleti seç.", s: 'pwr' },
+  { t: "Bölüm 6: Gölgeler Labirenti", d: "Korkularınız canlanıyor. Sağ: Korkunla yüzleş. Sol: Kaç.", s: 'sac' },
+  { t: "Bölüm 7: Final: Taç Odası", d: "Taç önünde. Sağ: Tacı Tak. Sol: Tacı Kır." }
 ];
 
+function speak(t) {
+  synth.cancel(); const u = new SpeechSynthesisUtterance(t);
+  u.lang = 'tr-TR'; u.rate = conf.rate; u.pitch = conf.pitch;
+  synth.speak(u); document.getElementById('big').innerText = t;
+}
+
+function updateUI() {
+  document.getElementById('hpFill').style.width = player.hp + "%";
+  if(player.char) document.getElementById('charName').innerText = player.char.n + " | HP: " + player.hp;
+}
+
 function handleInput(act) {
-  if (mode === 'intro') {
-    mode = 'game';
-    runChapter();
-  } else if (mode === 'game') {
-    const c = story[step];
-    if (act === 'R') { player.score[c.s] += 2; } 
-    else if (act === 'L') { player.score.bet += 1; }
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  
+  if(mode === 'menu') {
+    if(act === 'up') { menuIdx = (menuIdx - 1 + menuItems.length) % menuItems.length; speak(menuItems[menuIdx]); }
+    else if(act === 'down') { menuIdx = (menuIdx + 1) % menuItems.length; speak(menuItems[menuIdx]); }
+    else if(act === 'tap' || act === 'doubletap') {
+      if(menuIdx === 0) { if(!player.char) player.char = chars[0]; mode = 'game'; nextStep(); }
+      else if(menuIdx === 1) { mode = 'char_select'; speak(chars[charIdx].n + ". " + chars[charIdx].d); }
+      else if(menuIdx === 2) { speak("Ayarlar: Hız ve Ses perdesi."); }
+    }
+  } 
+  else if(mode === 'char_select') {
+    if(act === 'right' || act === 'left') { charIdx = (charIdx + (act==='right'?1:-1) + chars.length)%chars.length; speak(chars[charIdx].n + ". " + chars[charIdx].d); }
+    else if(act === 'tap' || act === 'doubletap') { player.char = chars[charIdx]; player.hp = player.char.hp; mode = 'menu'; speak(player.char.n + " seçildi. Ana menüye dönüldü."); updateUI(); }
+  }
+  else if(mode === 'game') {
+    const c = story[step-1];
+    if(act === 'R') { player.score[c.s] += 2; } 
+    else if(act === 'L') { player.score.bet += 1; }
     
-    step++;
-    if (step < story.length) runChapter();
-    else calculateEnding(act === 'R');
+    if(step >= story.length) calculateEnding(act === 'R');
+    else nextStep();
   }
 }
 
-function runChapter() {
-  const c = story[step];
-  document.getElementById('ui').innerText = "Bölüm: " + c.id + " / 7";
-  speak(c.n + ". " + c.d);
+function nextStep() {
+  const c = story[step]; step++;
+  speak(c.t + ". " + c.d);
 }
 
 function calculateEnding(tookCrown) {
   mode = 'end';
-  const s = player.score;
-  let final = "";
+  const s = player.score; let f = "";
   if(tookCrown) {
-    if(s.bet > 3) final = "Son 1: Taç’ın Karanlık Hükmü. Zindan Taç ile birleşti.";
-    else if(s.pwr > 3) final = "Son 4: Güç Dengesi. Dünya sert bir adaletle yönetiliyor.";
-    else final = "Son 5: Taç'ın Hürriyeti. Gölgeler dünyayı istila etti.";
+    if(s.bet > 3) f = "Son 1: Taç’ın Karanlık Hükmü.";
+    else if(s.pwr > 3) f = "Son 4: Güç Dengesi.";
+    else f = "Son 5: Taç'ın Hürriyeti.";
   } else {
-    if(s.sac > 3) final = "Son 2: Kırılış ve Yok Oluş. Zindan çöktü, dünya kurtuldu.";
-    else if(s.kno > 3) final = "Son 3: Taç'ı Saklamak. Lira ebedi nöbeti seçti.";
-    else final = "Son 8: Sonsuz Döngü. Macera yeniden başlıyor.";
+    if(s.sac > 3) f = "Son 2: Kırılış ve Yok Oluş.";
+    else if(s.kno > 3) f = "Son 3: Taç'ı Saklamak.";
+    else f = "Son 8: Sonsuz Döngü.";
   }
-  speak(final);
-  setTimeout(() => location.reload(), 12000);
+  speak(f + " Oyun bitti.");
+  setTimeout(()=>location.reload(), 15000);
 }
 
-// Touch & Swipe Logic
-let tX, tY;
-document.getElementById('big').addEventListener('touchstart', e => { 
-  tX = e.touches[0].clientX; 
-  tY = e.touches[0].clientY; 
-  if(audioCtx.state === 'suspended') audioCtx.resume();
-});
-
+// Touch Engine
+let tX, tY, lastTap = 0;
+document.getElementById('big').addEventListener('touchstart', e => { tX = e.touches[0].clientX; tY = e.touches[0].clientY; });
 document.getElementById('big').addEventListener('touchend', e => {
   const dX = e.changedTouches[0].clientX - tX;
   const dY = e.changedTouches[0].clientY - tY;
-  if (Math.abs(dX) > 40) handleInput(dX > 0 ? 'R' : 'L');
-  else if (Math.abs(dY) < 10) handleInput('TAP');
+  const now = Date.now();
+  if(now - lastTap < 300) handleInput('doubletap');
+  else if(Math.abs(dX) > 40) handleInput(dX > 0 ? 'R' : 'L');
+  else if(Math.abs(dY) > 40) handleInput(dY > 0 ? 'down' : 'up');
+  else handleInput('tap');
+  lastTap = now;
 });
 
-window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
+window.onload = () => { voices = window.speechSynthesis.getVoices(); };
 </script>
 </body>
 </html>
